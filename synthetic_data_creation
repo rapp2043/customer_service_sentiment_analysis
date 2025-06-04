@@ -1,0 +1,65 @@
+import pandas as pd
+import random
+from faker import Faker
+
+fake = Faker()
+
+# Feedback score mapping for sentiment
+def feedback_score(sentiment):
+    if sentiment == 'positive':
+        return random.randint(8, 10)
+    elif sentiment == 'neutral':
+        return random.randint(4, 7)
+    else:
+        return random.randint(1, 3)
+
+# Generate feedback sentences
+def generate_feedback(sentiment):
+    positive = [
+        "I love the product! It exceeded my expectations.",
+        "Customer service was excellent and very responsive.",
+        "I had a fantastic experience. Will definitely return.",
+        "Everything was delivered ahead of schedule.",
+        "Very satisfied with the quality and support."
+    ]
+    neutral = [
+        "The product was okay, nothing special.",
+        "Delivery was on time, but packaging could be better.",
+        "The experience was average.",
+        "Nothing stood out, but nothing was particularly bad either.",
+        "It works as described, but I expected more features."
+    ]
+    negative = [
+        "I'm disappointed with the product quality.",
+        "Customer service was unhelpful.",
+        "The order arrived late and was damaged.",
+        "I won't be purchasing again.",
+        "Very dissatisfied. It didn't meet my needs."
+    ]
+    samples = {
+        'positive': positive,
+        'neutral': neutral,
+        'negative': negative
+    }
+    count = random.randint(1, 4)
+    return " ".join(random.choices(samples[sentiment], k=count))
+
+# Assign sentiments with some imbalance (e.g., more positives)
+sentiments = ['positive'] * 150 + ['neutral'] * 90 + ['negative'] * 60
+random.shuffle(sentiments)
+
+data = []
+for i in range(300):
+    sentiment = sentiments[i]
+    feedback = generate_feedback(sentiment)
+    score = feedback_score(sentiment)
+    order_number = fake.bothify(text='ORD-#####')
+    data.append({
+        "order_number": order_number,
+        "feedback": feedback,
+        "score": score
+    })
+
+df = pd.DataFrame(data)
+import ace_tools as tools; tools.display_dataframe_to_user(name="Customer Feedback Dataset", dataframe=df)
+df.head()
