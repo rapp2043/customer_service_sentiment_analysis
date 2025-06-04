@@ -1,0 +1,185 @@
+# Retrieve Classification Scores
+
+# Add this line before applying the sentiment analysis
+!python -m textblob.download_corpora
+
+import pandas as pd
+from textblob import TextBlob
+
+# Load dataset
+df = pd.read_csv("Customer_Feedback_Dataset.csv")
+
+# Function to analyze sentiment sentence by sentence
+def get_sentence_sentiments(text):
+    blob = TextBlob(text)
+    sentiments = [sentence.sentiment.polarity for sentence in blob.sentences]
+    return sentiments  # List of sentiment scores for each sentence
+
+# Apply sentiment analysis
+df["sentence_sentiments"] = df["feedback"].apply(get_sentence_sentiments)
+
+# Save results
+df.to_csv("1_customer_feedback_with_sentence_sentiment.csv", index=False)
+
+# Display sample results
+print(df.head())
+
+
+
+# Assign Sentiment Classifications
+
+import pandas as pd
+from textblob import TextBlob
+
+# Load dataset
+df = pd.read_csv("1_customer_feedback_with_sentence_sentiment.csv")
+
+# Function to analyze sentiment sentence by sentence
+def get_sentence_sentiments(text):
+    blob = TextBlob(text)
+    sentiments = [sentence.sentiment.polarity for sentence in blob.sentences]
+    classifications = [
+        "Positive" if score > 0 else "Negative" if score < 0 else "Neutral"
+        for score in sentiments
+    ]
+    return sentiments, classifications  # Returning both lists
+
+# Apply sentiment analysis
+df[["sentence_sentiments", "sentiment_classifications"]] = df["feedback"].apply(
+    lambda text: pd.Series(get_sentence_sentiments(text))
+)
+
+# Save results
+df.to_csv("2_customer_feedback_with_sentiment.csv", index=False)
+
+# Display sample results
+print(df.head())
+
+
+
+# Assign Feedback Keywords
+
+# Install KeyBERT
+!pip install keybert
+
+import pandas as pd
+from keybert import KeyBERT
+
+# Load dataset with sentiment classifications
+df = pd.read_csv("2_customer_feedback_with_sentiment.csv")
+
+# Initialize KeyBERT model
+kw_model = KeyBERT()
+
+# Function to extract keywords
+def extract_keywords(text):
+    keywords = kw_model.extract_keywords(text, keyphrase_ngram_range=(1,2), stop_words="english")
+    return [kw[0] for kw in keywords]  # Extract only keywords, ignoring scores
+
+# Apply keyword extraction
+df["keywords"] = df["feedback"].apply(extract_keywords)
+
+# Group sentences by sentiment classification
+grouped_keywords = df.groupby("sentiment_classifications")["keywords"].sum()
+
+# Save results
+df.to_csv("3_customer_feedback_with_keywords.csv", index=False)
+
+# Display sample output
+print(grouped_keywords)
+
+
+
+# Assign Categories Based on Feedback
+
+import pandas as pd
+
+# Example categories and their related keywords
+category_keywords = {
+    "Billing Issues": ["invoice", "charge", "refund", "payment"],
+    "Product Quality": ["defective", "broken", "quality", "damaged"],
+    "Support Experience": ["rude", "helpful", "support", "customer service"],
+    "Delivery Concerns": ["delay", "shipping", "late", "lost"]
+}
+
+# Load dataset from the file containing the keywords column
+df = pd.read_csv("3_customer_feedback_with_keywords.csv")
+
+# Function to assign categories based on keywords
+def assign_category(keywords):
+    # Ensure keywords is a list, as it's loaded from CSV and might be a string representation
+    if isinstance(keywords, str):
+        # Attempt to evaluate the string as a list
+        try:
+            keywords = eval(keywords)
+        except (SyntaxError, NameError):
+            # If eval fails, treat it as an empty list or handle as needed
+            return "Other" # Or handle the error appropriately
+
+    # Ensure keywords is iterable before checking 'in'
+    if not isinstance(keywords, (list, tuple)):
+        return "Other" # Or handle the error appropriately
+
+    for category, words in category_keywords.items():
+        # Ensure each word is lower case for case-insensitive matching
+        if any(word.lower() in [kw.lower() for kw in keywords] for word in words):
+            return category
+    return "Other"  # Default category for unmatched feedback
+
+# Apply categorization to the 'feedback' column
+df["categorized_feedback"] = df["keywords"].apply(assign_category)
+
+# Save results
+df.to_csv("4_customer_feedback_categorized_final_result.csv", index=False)
+
+# Display sample output
+print(df.head())
+
+
+
+# Adds Overall Sentiment Score and Detects Mismatches Between Sentiment Score and Likert Score
+
+import pandas as pd
+from textblob import TextBlob
+
+# Load dataset
+df = pd.read_csv("4_customer_feedback_categorized_final_result.csv")
+
+# Function to analyze sentiment sentence by sentence
+def get_sentence_sentiments(text):
+    blob = TextBlob(text)
+    sentiments = [sentence.sentiment.polarity for sentence in blob.sentences]
+    return sentiments
+
+# Function to get overall sentiment
+def get_overall_sentiment(text):
+    return TextBlob(text).sentiment.polarity
+
+# Function to classify sentiment
+def classify_sentiment(polarity):
+    if polarity > 0.1:
+        return "Positive"
+    elif polarity < -0.1:
+        return "Negative"
+    else:
+        return "Neutral"
+
+# Function to check mismatch between sentiment and score
+def check_mismatch(sentiment_class, score):
+    if sentiment_class == "Positive" and score <= 5:
+        return True
+    elif sentiment_class == "Negative" and score > 5:
+        return True
+    return False
+
+# Apply sentiment analysis
+df["sentence_sentiments"] = df["feedback"].apply(get_sentence_sentiments)
+df["overall_sentiment"] = df["feedback"].apply(get_overall_sentiment)
+df["sentiment_classification"] = df["overall_sentiment"].apply(classify_sentiment)
+df["mismatch"] = df.apply(lambda row: check_mismatch(row["sentiment_classification"], row["score"]), axis=1)
+
+# Save results
+df.to_csv("5_customer_feedback_with_sentiment_and_mismatch.csv", index=False)
+
+# Display sample
+print(df[["feedback", "score", "overall_sentiment", "sentiment_classification", "mismatch"]].head())
